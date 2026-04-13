@@ -1,8 +1,33 @@
+import anyio
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, status
 from user.router import router
 
-app = FastAPI()
+
+#스레드풀 크기조정
+@asynccontextmanager
+async def lifespan(_):
+    limiter = anyio.to_thread.current_default_thread_limiter()
+    limiter.total_tokens = 200
+    yield
+
+app = FastAPI(lifespan=lifespan)
 app.include_router(router)
+
+
+
+def aws_sync():
+    #AWS 서버랑 통신(예:2초)
+    return
+
+from starlette.concurrency import run_in_threadpool
+
+@app.get("/async")
+async def async_handler():
+    await run_in_threadpool(aws_sync) # 동기 함수를 비동기 방식으로 실행하게 해주는 유틸리티 함수
+    return {"msg": "ok"}
+
 
 # # 테스트
 # # python decorator : 함수를 꾸며주는, 함수에 추가기능을 부여하는 문법
