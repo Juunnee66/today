@@ -1,1 +1,4 @@
-llama/
+llama/__pycache__
+llama/.venv
+llama/models
+.DS_Store
