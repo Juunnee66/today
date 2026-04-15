@@ -1,0 +1,17 @@
+# 다수의 컨테이너를 다루기위해 만드는 파일 : yml
+# 들여쓰기로 계층구조가 결정됨
+services:
+ api:
+  build: .
+  ports:
+    - "8000:8000"
+  depends_on:
+    - db
+
+ db:
+  image: mysql:8.0
+  environment:
+    MYSQL_ROOT_PASSWORD: password
+    MYSQL_DATABASE: app_db
+  ports:
+    - "33060:3306"
