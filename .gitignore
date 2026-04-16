@@ -2,3 +2,7 @@ llama/__pycache__
 llama/.venv
 llama/models
 .DS_Store
+__pycache__/
+*.pyc
+*.gguf
+docker/worker/models/
