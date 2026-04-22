@@ -1,24 +1,24 @@
-from fastapi import APIRouter, status, Depends, HTTPException
+from fastapi import APIRouter, status, Depends, HTTPException, Body
+from fastapi.security import HTTPBearer
 from sqlalchemy import select  
 
-
+from auth.jwt import create_access_token, verify_user
 from auth.password import hash_password, verify_password
 from database.connection import get_session
-from user.models import User
-from user.request import SignUpRequest, LogInRequest
+from user.models import User, HealthProfile
+from user.request import SignUpRequest, LogInRequest, HealthProfileRequest
 from user.response import UserResponse
 
 
 router = APIRouter(tags=["User"])
 
-
+ # 회원가입 API
 @router.post(
     "/users",
     summary="회원가입 API",
     status_code=status.HTTP_201_CREATED,
     response_model=UserResponse,
 )
-
 async def signup_handler(
     body: SignUpRequest,
     session = Depends(get_session),
@@ -48,6 +48,7 @@ async def signup_handler(
 
     return new_user
 
+# 로그인 API
 @router.post(
     "/users/login",
     summary="로그인 API",
@@ -69,7 +70,7 @@ async def login_handler(
             detail="등록되지 않은 이메일입니다.",
         )
 
-    # 2) body.password<>사용자.password_hash 검증
+    # 2) body.password <> 사용자.password_hash 검증
     verified = verify_password(
         plain_password=body.password,
         password_hash=user.password_hash
@@ -81,5 +82,44 @@ async def login_handler(
         )
 
     # 3) JWT(JSON Web Token) 발급
-    
-    return
+    access_token = create_access_token(user_id=user.id)
+    return {"access_token": access_token}
+
+
+# 건강 프로필 생성
+@router.post(
+    "/health-profiles",
+    summary="건강 프로필 생성 API",
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_health_profile_handler(
+    # 클라이언트가 보낸 Authorization Header를 읽어줌
+    user_id = Depends(verify_user),
+    body: HealthProfileRequest = Body(...),
+    session = Depends(get_session),
+):
+    # 1) 건강프로필 중복검사
+    stmt = (
+        select(HealthProfile)
+        .where(HealthProfile.user_id == user_id)
+    )
+
+    result = await session.execute(stmt)
+    existing_profile = result.scalar()
+    if existing_profile:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="이미 건강 프로필이 존재합니다.",
+        )
+    # 2) 건강 프로필 생성 & 저장
+    profile_data = body.model_dump() # 덤프가 자동으로 딕셔너리 만들어줌
+    new_profile = HealthProfile(
+        user_id=user_id, **profile_data)
+
+
+    session.add(new_profile)
+    await session.commit()
+    await session.refresh(new_profile)
+
+    return new_profile
+
